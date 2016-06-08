@@ -5,6 +5,8 @@ my $VERSION = 1.0;
 use strict;
 use Getopt::Long;
 use File::Copy;
+use DateTime::Duration;
+use DateTime;
 
 my ($ics,$remove_events_older_than,$dry_run,$help,$quiet);
 GetOptions('ics:s'=>\$ics, 'remove-events-older-than:s'=>\$remove_events_older_than, 'dry-run!'=>\$dry_run, 'help|usage!'=>\$help, 'quiet!'=>\$quiet) ;
@@ -14,7 +16,9 @@ Parameters :
 	ICS file to import (require)
 
 --remove-events-older-than=yyyy-mm-dd
-	Remove events older than the date
+	or
+--remove-events-older-than=2D | 2W | 2M | 2Y
+	Remove events older than the date or the duration in days, weeks, months or years (require)
 
 --dry-run
 	Only do a simulation
@@ -31,12 +35,30 @@ open(ICS,"<$ics") or die "Unable to open ics file '$ics' ($!)";
 my $content = join('',<ICS>);
 close(ICS);
 
-die "Date format '$remove_events_older_than' is malformed.\nGood format is yyyy-mm-dd" unless $remove_events_older_than =~ /^\d{4}-\d{2}-\d{2}$/;
-$remove_events_older_than =~ s/-//g;
 
-if ($dry_run) {
-	print "I'm running in dry-run mode, I won't do anything\n" unless $quiet;
+# --remove_events_older_than can be a duration
+my $older_than = DateTime->now;
+my %units_keywords = qw/	d days		days days		day days
+							w weeks 	weeks weeks 	week weeks
+							m months 	months months	month months
+							y years		years years		year years/;
+
+my $possible_units = join('|',keys %units_keywords);
+
+# remove units from current date
+if ($remove_events_older_than =~ /^(\d+)($possible_units)$/i) {
+	$older_than->subtract_duration( DateTime::Duration->new( $units_keywords{lc($2)} => $1 ) );
+	$remove_events_older_than = $older_than->ymd;
+
+# remove_events_older_than can be a specific date in format yyyy-mm-dd
+} elsif ($remove_events_older_than =~ /^\d{4}-\d{2}-\d{2}$/) {
+
+} else {
+	die "Date format '$remove_events_older_than' is malformed.\nGood format is yyyy-mm-dd"
 }
+
+my $original_remove_events_older_than = $remove_events_older_than;
+$remove_events_older_than =~ s/-//g;
 
 unless ($dry_run) {
 	open(OUTPUT,"+>$ics.tmp") or die "Unable to create temporary file '$ics.tmp' ($!)";
@@ -46,10 +68,13 @@ unless ($dry_run) {
 $content =~ /^BEGIN:VEVENT$/im ;
 print OUTPUT $` unless $dry_run;
 
+my ($nb_events,$nb_deleted_events) = (0,0);
 
 while($content =~ /(BEGIN:VEVENT.+?END:VEVENT)/gis) { # match an event
 	my $event = $1;
 	my ($uid) 	= ($event =~ m/^UID:(.+)$/im);
+	$nb_events++;
+
 	my $delete_event = 0;
 	my $until = '';
 
@@ -68,8 +93,9 @@ while($content =~ /(BEGIN:VEVENT.+?END:VEVENT)/gis) { # match an event
 	}
 
 	
-	if ($delete_event == 1) {		
-		print "Delete event : $uid (end at $date_eventend)\n" unless $quiet;
+	if ($delete_event == 1) {
+		printf "Delete event : %s (end at %04d-%02d-%02d)\n", $uid, substr($date_eventend,0,4,), substr($date_eventend,4,2), substr($date_eventend,6,4) unless $quiet;
+		$nb_deleted_events++;
 	} else {
 		print OUTPUT "$event\n" unless $dry_run;
 	}
@@ -86,3 +112,11 @@ unless ($dry_run) {
 	# move new ics to old one
 	move("$ics.tmp",$ics) or die "Unable to rename $ics.tmp to $ics ($!)";
 }
+
+if ($dry_run) {
+	print "\n/!\\ I'm running in dry-run mode, I don't do anything /!\\\n" unless $quiet;
+}
+
+
+print  "\nRemove events older than $original_remove_events_older_than\n";
+printf "Removed %d of %d events (%0.1f %%)", $nb_deleted_events, $nb_events, (100*$nb_deleted_events / $nb_events) unless $quiet;
