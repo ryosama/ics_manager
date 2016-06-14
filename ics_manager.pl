@@ -30,6 +30,7 @@ Parameters :
 	No output
 EOT
 
+die "Option --ics is missing" if length($ics) <= 0;
 die "Unable to find ics file '$ics'" unless -e $ics;
 open(ICS,"<$ics") or die "Unable to open ics file '$ics' ($!)";
 my $content = join('',<ICS>);
@@ -53,6 +54,8 @@ if ($remove_events_older_than =~ /^(\d+)($possible_units)$/i) {
 # remove_events_older_than can be a specific date in format yyyy-mm-dd
 } elsif ($remove_events_older_than =~ /^\d{4}-\d{2}-\d{2}$/) {
 
+} elsif (length($remove_events_older_than) <= 0) {
+	die "Option --remove_events_older_than is missing";
 } else {
 	die "Date format '$remove_events_older_than' is malformed.\nGood format is yyyy-mm-dd"
 }
@@ -76,24 +79,29 @@ while($content =~ /(BEGIN:VEVENT.+?END:VEVENT)/gis) { # match an event
 	$nb_events++;
 
 	my $delete_event = 0;
-	my $until = '';
+	my $preserve_event = 0;
 
+	my $until = '';
 	my ($freq) 	= ($event =~ m/^RRULE:FREQ=(.+)$/im);
 	if (length($freq) > 0) { # event has a frequence --> skip
 		($until) = ($freq =~ m/;UNTIL=(\d{8})/i);
 		if (length($until)>0) {
-			$delete_event = 1 if $until < $remove_events_older_than ;
+			if ($until < $remove_events_older_than) {
+				$delete_event = 2 ;
+			} else {
+				$preserve_event = 1 ;
+			}
+		} else {
+			$preserve_event = 1 ;
 		}
 	}
 
-
 	my ($date_eventend) = ($event =~ m/^DTEND;(?:.+?):(\d{8})/im);
-	if (length($date_eventend) > 0) {
+	if (length($date_eventend) > 0 && $preserve_event == 0) {
 		$delete_event = 1 if $date_eventend < $remove_events_older_than ;
 	}
-
 	
-	if ($delete_event == 1) {
+	if ($delete_event > 0) {
 		printf "Delete event : %s (end at %04d-%02d-%02d)\n", $uid, substr($date_eventend,0,4,), substr($date_eventend,4,2), substr($date_eventend,6,4) unless $quiet;
 		$nb_deleted_events++;
 	} else {
@@ -116,7 +124,6 @@ unless ($dry_run) {
 if ($dry_run) {
 	print "\n/!\\ I'm running in dry-run mode, I don't do anything /!\\\n" unless $quiet;
 }
-
 
 print  "\nRemove events older than $original_remove_events_older_than\n";
 printf "Removed %d of %d events (%0.1f %%)", $nb_deleted_events, $nb_events, (100*$nb_deleted_events / $nb_events) unless $quiet;

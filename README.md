@@ -8,8 +8,11 @@ Manage events inside ICS file
 	ICS file to manage (require)
 
 `--remove-events-older-than`=yyyy-mm-dd
-	or
+
+or
+
 `--remove-events-older-than`=2D | 2W | 2M | 2Y
+
 	Remove events older than the date or the duration in days, weeks, months or years (require)
 
 `--dry-run`
@@ -24,4 +27,5 @@ Manage events inside ICS file
 # Examples
 ----------
 `perl ics_manager.pl --ics=bob.ics --remove-events-older-than=2015-01-01`
+
 `perl ics_manager.pl --dry-run --ics=bob.ics --remove-events-older-than=5years`
