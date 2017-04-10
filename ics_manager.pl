@@ -64,12 +64,14 @@ my $original_remove_events_older_than = $remove_events_older_than;
 $remove_events_older_than =~ s/-//g;
 
 unless ($dry_run) {
-	open(OUTPUT,"+>$ics.tmp") or die "Unable to create temporary file '$ics.tmp' ($!)";
+	open(OUTPUT, "+>$ics.tmp") or die "Unable to create temporary file '$ics.tmp' ($!)";
+	open(DELETED,"+>deleted.ics") or die "Unable to create deleted file 'deleted.ics' ($!)";
 }
 
 # print calendar header
 $content =~ /^BEGIN:VEVENT$/im ;
-print OUTPUT $` unless $dry_run;
+print OUTPUT  $` unless $dry_run;
+print DELETED $` unless $dry_run;
 
 my ($nb_events,$nb_deleted_events) = (0,0);
 
@@ -103,6 +105,7 @@ while($content =~ /(BEGIN:VEVENT.+?END:VEVENT)/gis) { # match an event
 	
 	if ($delete_event > 0) {
 		printf "Delete event : %s (end at %04d-%02d-%02d)\n", $uid, substr($date_eventend,0,4,), substr($date_eventend,4,2), substr($date_eventend,6,4) unless $quiet;
+		print DELETED "$event\n" unless $dry_run;
 		$nb_deleted_events++;
 	} else {
 		print OUTPUT "$event\n" unless $dry_run;
@@ -111,8 +114,10 @@ while($content =~ /(BEGIN:VEVENT.+?END:VEVENT)/gis) { # match an event
 
 # print calendar footer
 unless ($dry_run) {
-	print OUTPUT "END:VCALENDAR\n";
+	print OUTPUT  "END:VCALENDAR\n";
+	print DELETED "END:VCALENDAR\n";
 	close(OUTPUT);
+	close(DELETED);
 
 	# make a backup of original ics
 	move($ics,"$ics.bak") or die "Unable to make a backup or original ICS ($!)";
