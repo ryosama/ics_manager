@@ -8,8 +8,8 @@ use File::Copy;
 use DateTime::Duration;
 use DateTime;
 
-my ($ics,$remove_events_older_than,$dry_run,$help,$quiet);
-GetOptions('ics:s'=>\$ics, 'remove-events-older-than:s'=>\$remove_events_older_than, 'dry-run!'=>\$dry_run, 'help|usage!'=>\$help, 'quiet!'=>\$quiet) ;
+my ($ics,$remove_events_older_than,$dry_run,$no_backup,$help,$quiet);
+GetOptions('ics:s'=>\$ics, 'remove-events-older-than:s'=>\$remove_events_older_than, 'dry-run!'=>\$dry_run, 'no-backup!'=>\$no_backup, 'help|usage!'=>\$help, 'quiet!'=>\$quiet) ;
 die <<EOT if ($help || length($ics)<=0);
 Parameters :
 --ics=xxx
@@ -22,6 +22,9 @@ Parameters :
 
 --dry-run
 	Only do a simulation
+
+--no-backup
+	Do not create backup /!\\dangerous/!\\
 
 --usage or --help
 	Display this message
@@ -65,7 +68,7 @@ $remove_events_older_than =~ s/-//g;
 
 unless ($dry_run) {
 	open(OUTPUT, "+>$ics.tmp") or die "Unable to create temporary file '$ics.tmp' ($!)";
-	open(DELETED,"+>deleted.ics") or die "Unable to create deleted file 'deleted.ics' ($!)";
+	open(DELETED,"+>$ics.deleted.ics") or die "Unable to create deleted file '$ics.deleted.ics' ($!)";
 }
 
 # print calendar header
@@ -120,7 +123,9 @@ unless ($dry_run) {
 	close(DELETED);
 
 	# make a backup of original ics
-	move($ics,"$ics.bak") or die "Unable to make a backup or original ICS ($!)";
+	unless ($no_backup) {
+		move($ics,"$ics.bak") or die "Unable to make a backup or original ICS ($!)";
+	}
 
 	# move new ics to old one
 	move("$ics.tmp",$ics) or die "Unable to rename $ics.tmp to $ics ($!)";
