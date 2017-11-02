@@ -18,6 +18,9 @@ or
 `--dry-run`
 	Only do a simulation
 
+`--no-backup`
+	Do not create backup /!\dangerous/!\
+
 `--usage` or `--help`
 	Display this message
 
